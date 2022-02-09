@@ -2,6 +2,7 @@
 name = "woongdle"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 authors = [ "Kang Hyunwoong hyunwoong.kang@leedotype.com" ]
 description = "Wordle implemented in Rust as a CLI"
 homepage = "https://github.com/hwoongkang/woongdle"
