@@ -3,39 +3,30 @@ use crate::utils;
 use std::io;
 use termion::{clear, color, style};
 
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum State {
-    Correct,
-    Present,
-    Absent,
-    Unused,
-}
-
-impl State {
-    pub fn get_block(&self) -> char {
-        match self {
-            State::Correct => '🟩',
-            State::Present => '🟨',
-            State::Absent => '⬛',
-            State::Unused => '⬜',
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
-pub struct Tile {
-    letter: char,
-    guess: State,
+#[derive(Copy, Clone, PartialEq)]
+pub enum Tile {
+    Correct(char),
+    Present(char),
+    Absent(char),
+    Unused(char),
 }
 
 impl Tile {
     pub fn print(&self) {
         let fg = color::Fg(color::LightWhite);
-        match self.guess {
-            State::Correct => print!("{}{}{}", color::Bg(color::Green), fg, self.letter),
-            State::Present => print!("{}{}{}", color::Bg(color::Yellow), fg, self.letter),
-            State::Absent => print!("{}{}{}", color::Bg(color::LightBlack), fg, self.letter),
-            State::Unused => print!("{}{}{}", color::Bg(color::Black), fg, self.letter),
+        match self {
+            Self::Correct(letter) => print!("{}{}{}", color::Bg(color::Green), fg, letter),
+            Self::Present(letter) => print!("{}{}{}", color::Bg(color::Yellow), fg, letter),
+            Self::Absent(letter) => print!("{}{}{}", color::Bg(color::LightBlack), fg, letter),
+            Self::Unused(letter) => print!("{}{}{}", color::Bg(color::Black), fg, letter),
+        }
+    }
+    pub fn get_block(&self) -> char {
+        match self {
+            Self::Correct(_) => '🟩',
+            Self::Present(_) => '🟨',
+            Self::Absent(_) => '⬛',
+            Self::Unused(_) => '⬜',
         }
     }
 }
@@ -51,13 +42,19 @@ impl Guess {
     }
 
     fn is_correct(&self) -> bool {
-        self.tiles.iter().all(|tile| tile.guess == State::Correct)
+        self.tiles.iter().all(|tile| {
+            if let Tile::Correct(_) = tile {
+                true
+            } else {
+                false
+            }
+        })
     }
 }
 
 pub struct History {
     guesses: Vec<Guess>,
-    chars: [State; 26],
+    chars: [Tile; 26],
     ans: [char; 5],
 }
 
@@ -71,14 +68,7 @@ impl History {
         println!("Each guess must be a valid 5 letter word. Hit the enter button to submit.");
         println!("After each guess, the color of the tiles will change to show how close your guess was to the word.");
         println!("");
-        self.chars
-            .iter()
-            .enumerate()
-            .map(|(ind, state)| Tile {
-                letter: utils::u8_to_char(ind as u8),
-                guess: *state,
-            })
-            .for_each(|tile| tile.print());
+        self.chars.iter().for_each(|tile| tile.print());
         println!("{}", style::Reset);
         println!("");
 
@@ -88,34 +78,32 @@ impl History {
     }
 
     pub fn new(ans: [char; 5]) -> Self {
+        let mut chars = [Tile::Unused(' '); 26];
+        for ind in 0..26 {
+            chars[ind] = Tile::Unused(utils::u8_to_char(ind as u8));
+        }
         History {
             ans,
+            chars,
             guesses: Vec::new(),
-            chars: [State::Unused; 26],
         }
     }
 
     pub fn add_guess(&mut self, word: &str) -> bool {
-        let mut tiles = [Tile {
-            letter: ' ',
-            guess: State::Absent,
-        }; 5];
+        let mut tiles = [Tile::Absent(' '); 5];
         word.to_lowercase()
             .chars()
             .zip(&self.ans)
             .map(|(letter, truth)| {
-                let state = if letter == *truth {
-                    State::Correct
+                let tile = if letter == *truth {
+                    Tile::Correct(letter)
                 } else if self.ans.contains(&letter) {
-                    State::Present
+                    Tile::Present(letter)
                 } else {
-                    State::Absent
+                    Tile::Absent(letter)
                 };
-                self.chars[utils::char_to_usize(letter)] = state;
-                Tile {
-                    letter,
-                    guess: state,
-                }
+                self.chars[utils::char_to_usize(letter)] = tile;
+                tile
             })
             .enumerate()
             .for_each(|(i, tile)| {
@@ -133,7 +121,7 @@ impl History {
         println!("Your wordle:");
         for guess in self.guesses.iter() {
             for tile in guess.tiles.iter() {
-                print!("{}", tile.guess.get_block());
+                print!("{}", tile.get_block());
             }
             println!("");
         }
