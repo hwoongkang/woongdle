@@ -1,4 +1,6 @@
+use super::ans;
 use crate::utils;
+use std::io;
 use termion::{clear, color, style};
 
 type Bg = color::Bg<color::Rgb>;
@@ -54,32 +56,6 @@ impl Guess {
     fn print(&self) {
         self.tiles.iter().for_each(|tile| tile.print());
         println!("{}", style::Reset);
-    }
-
-    fn from(word: &str, ans: &[char; 5]) -> Self {
-        let mut tiles = [Tile {
-            letter: ' ',
-            guess: State::Absent,
-        }; 5];
-        word.to_lowercase()
-            .chars()
-            .zip(ans)
-            .map(|(letter, truth)| {
-                let guess = if letter == *truth {
-                    State::Correct
-                } else if ans.contains(&letter) {
-                    State::Present
-                } else {
-                    State::Absent
-                };
-
-                Tile { letter, guess }
-            })
-            .enumerate()
-            .for_each(|(i, tile)| {
-                tiles[i] = tile;
-            });
-        Guess { tiles }
     }
 
     fn is_correct(&self) -> bool {
@@ -155,7 +131,7 @@ impl History {
             });
         let guess = Guess { tiles };
         let flag = guess.is_correct();
-        self.guesses.push(Guess::from(word, &self.ans));
+        self.guesses.push(guess);
         flag
     }
 
@@ -168,6 +144,65 @@ impl History {
                 print!("{}", tile.guess.get_block());
             }
             println!("");
+        }
+    }
+}
+
+pub struct Game {
+    history: History,
+}
+
+impl Game {
+    pub fn new() -> Game {
+        let ans = ans::generate();
+        let history = History::new(ans);
+        Game { history }
+    }
+
+    pub fn run(&mut self) -> () {
+        let mut count = 0;
+        let won = loop {
+            self.history.print();
+            if count == 6 {
+                break false;
+            }
+            count += 1;
+            if self.turn() {
+                break true;
+            }
+        };
+        if won {
+            self.history.print_result();
+        } else {
+            println!("You lost!");
+        }
+    }
+
+    fn turn(&mut self) -> bool {
+        loop {
+            let mut input = String::new();
+            io::stdin()
+                .read_line(&mut input)
+                .expect("Failed to read line");
+            let input = input.trim();
+            if !ans::is_five_letter_word(input) {
+                print!("{}", style::Bold);
+                print!("{}", color::Fg(color::Red));
+                print!("{}", "Invalid input. Please enter a 5 letter word.");
+                println!("{}", style::Reset);
+                continue;
+            } else if !ans::is_valid_word(input) {
+                print!(
+                    "\"{}{}\" {}is not a valid word.",
+                    style::Bold,
+                    input,
+                    color::Fg(color::Red)
+                );
+                println!("{}", style::Reset);
+                continue;
+            } else {
+                break self.history.add_guess(input);
+            }
         }
     }
 }
